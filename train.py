@@ -38,6 +38,8 @@ for epoch in range(EPOCHS):
     loop = tqdm(train_loader, desc=f"Epoch [{epoch+1}/{EPOCHS}]", leave=True)
 
     for images, masks in loop:
+        torch.save(model.state_dict(), f"results/unet_epoch{epoch+1}.pt")
+
         images = images.to(DEVICE)
         masks = masks.to(DEVICE)
 
@@ -52,3 +54,4 @@ for epoch in range(EPOCHS):
         loop.set_postfix(loss=loss.item())
 
     print(f"Epoch [{epoch+1}/{EPOCHS}] - Loss: {epoch_loss / len(train_loader):.4f}")
+
