@@ -12,9 +12,9 @@ class BUSIDataset(Dataset):
         self.image_names = sorted(os.listdir(image_dir))
         self.size = size
 
-        self.resize = transforms.Compose([
-            transforms.ToTensor(),  # Convert to [0,1] + add channel
-            transforms.Resize(self.size)
+        self.transform = transforms.Compose([
+            transforms.Resize(self.size),   # Resize PIL image first
+            transforms.ToTensor()           # Then convert to [0,1] float
         ])
 
     def __len__(self):
@@ -27,9 +27,9 @@ class BUSIDataset(Dataset):
 
         image = Image.open(image_path).convert("L")
         mask = Image.open(mask_path).convert("L")
-
-        image = self.resize(image)
-        mask = self.resize(mask)
+        image = self.transform(image)
+        mask = self.transform(mask)
+        mask = (mask > 0).float()  # Binarization step
 
         return image, mask
 
