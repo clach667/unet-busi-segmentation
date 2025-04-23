@@ -6,7 +6,7 @@ import numpy as np
 from torchvision import transforms
 
 class BUSIDataset(Dataset):
-    def __init__(self, image_dir, mask_dir, size=(512, 512)):
+    def __init__(self, image_dir, mask_dir, size=(256, 256)):
         self.image_dir = image_dir
         self.mask_dir = mask_dir
         self.image_names = sorted(os.listdir(image_dir))
