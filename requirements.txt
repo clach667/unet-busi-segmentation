@@ -1,0 +1,8 @@
+numpy
+pandas
+matplotlib
+scikit-learn
+opencv-python
+torch>=2.0
+torchvision
+tensorflow==2.14.0
