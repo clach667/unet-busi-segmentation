@@ -2,14 +2,20 @@ import os
 from torch.utils.data import Dataset
 from PIL import Image
 import numpy as np
-import torchvision.transforms as T
+
+from torchvision import transforms
 
 class BUSIDataset(Dataset):
-    def __init__(self, image_dir, mask_dir, transform=None):
+    def __init__(self, image_dir, mask_dir, size=(512, 512)):
         self.image_dir = image_dir
         self.mask_dir = mask_dir
-        self.transform = transform
         self.image_names = sorted(os.listdir(image_dir))
+        self.size = size
+
+        self.resize = transforms.Compose([
+            transforms.ToTensor(),  # Convert to [0,1] + add channel
+            transforms.Resize(self.size)
+        ])
 
     def __len__(self):
         return len(self.image_names)
@@ -19,21 +25,11 @@ class BUSIDataset(Dataset):
         image_path = os.path.join(self.image_dir, image_name)
         mask_path = os.path.join(self.mask_dir, image_name)
 
-        image = Image.open(image_path).convert("L")  # Grayscale
+        image = Image.open(image_path).convert("L")
         mask = Image.open(mask_path).convert("L")
 
-        image = np.array(image, dtype=np.float32) / 255.0
-        mask = np.array(mask, dtype=np.float32) / 255.0
-
-        # Add channel dimension
-        image = np.expand_dims(image, axis=0)
-        mask = np.expand_dims(mask, axis=0)
-
-        if self.transform:
-            # On peut ajouter des augmentations ici plus tard
-            image = self.transform(image)
-            mask = self.transform(mask)
+        image = self.resize(image)
+        mask = self.resize(mask)
 
         return image, mask
-
 
