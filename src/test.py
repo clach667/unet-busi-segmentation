@@ -3,10 +3,7 @@ from torch.utils.data import DataLoader
 from dataset import BUSIDataset
 from unet import BetterUNet
 import torch.nn.functional as F
-
 import os
-
-
 from torchvision.utils import save_image
 
 # ====== Params ======
