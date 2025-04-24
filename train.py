@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from src.dataset import BUSIDataset
-from src.unet import UNetPlusPlus  # Tu peux aussi l'appeler BetterUNet si tu veux
+from src.unet import UNet  # Tu peux aussi l'appeler BetterUNet si tu veux
 from src.utils import dice_loss, binary_accuracy
 from src.early_stopping import EarlyStopping
 
@@ -21,7 +21,7 @@ train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE)
 
 # ====== Model ======
-model = UNetPlusPlus(init_features=32, dropout=0.2).to(DEVICE)
+model = UNet().to(DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 
 # ====== Logging ======
