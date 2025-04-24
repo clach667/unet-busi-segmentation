@@ -1,44 +1,44 @@
+# train.py
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+import numpy as np
+import os
+
 from src.dataset import BUSIDataset
 from src.unet import BetterUNet
-from tqdm import tqdm
-from torchsummary import summary
+from src.utils import dice_loss, binary_accuracy
 
-# ====== Params ======
-EPOCHS = 10
-BATCH_SIZE = 4
-LR = 1e-3
+# Parameters
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+BATCH_SIZE = 4
+EPOCHS = 20
+LR = 1e-4  # Lower learning rate
+PATIENCE = 5
 
-# ====== Dataset & Splits ======
-dataset = BUSIDataset("/Users/clarachoukroun/unet-busi-project/data/images", "/Users/clarachoukroun/unet-busi-project/data/masks", size=(256, 256))
-train_size = int(0.7 * len(dataset))
-val_size = int(0.15 * len(dataset))
-test_size = len(dataset) - train_size - val_size
-train_set, val_set, test_set = random_split(dataset, [train_size, val_size, test_size])
+# Data
+train_set = BUSIDataset("data/train/images", "data/train/masks")
+val_set = BUSIDataset("data/val/images", "data/val/masks")
+test_set = BUSIDataset("data/test/images", "data/test/masks")
+
 train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE)
+test_loader = DataLoader(test_set, batch_size=1)
 
-# ====== Dice Loss ======
-def dice_loss(preds, targets, smooth=1e-8):
-    preds = torch.sigmoid(preds)
-    preds = preds.view(-1)
-    targets = targets.view(-1)
-    intersection = (preds * targets).sum()
-    return 1 - (2. * intersection + smooth) / (preds.sum() + targets.sum() + smooth)
-
-# ====== Accuracy ======
-def binary_accuracy(preds, targets, threshold=0.5):
-    preds_bin = (torch.sigmoid(preds) > threshold).float()
-    return (preds_bin == targets).float().mean().item()
-
-# ====== Model & Optim ======
-model = BetterUNet(init_features=32).to(DEVICE)
-summary(model, input_size=(1, 256, 256))
+# Model
+model = BetterUNet(init_features=32, dropout=0.2).to(DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+
+# Logs
+train_losses, val_losses = [], []
+train_accs, val_accs = [], []
+
+# Early Stopping
+best_val_loss = float('inf')
+patience_counter = 0
 
 # ====== Training Loop ======
 for epoch in range(1, EPOCHS + 1):
@@ -77,7 +77,29 @@ for epoch in range(1, EPOCHS + 1):
             val_loss += (bce + dice).item()
             val_acc += binary_accuracy(preds, masks)
 
-    print(f"Epoch {epoch}/{EPOCHS} | Loss: {avg_loss:.4f} | Acc: {avg_acc:.4f} | Val Loss: {val_loss / len(val_loader):.4f} | Val Acc: {val_acc / len(val_loader):.4f}")
+    val_loss /= len(val_loader)
+    val_acc /= len(val_loader)
 
-# Save the final model
-torch.save(model.state_dict(), "results/unet_final.pt")
+    print(f"Epoch {epoch}/{EPOCHS} | Loss: {avg_loss:.4f} | Acc: {avg_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+
+    train_losses.append(avg_loss)
+    val_losses.append(val_loss)
+    train_accs.append(avg_acc)
+    val_accs.append(val_acc)
+
+    # Early stopping check
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        patience_counter = 0
+        torch.save(model.state_dict(), "results/unet_final.pt")
+    else:
+        patience_counter += 1
+        if patience_counter >= PATIENCE:
+            print("Early stopping triggered.")
+            break
+
+# Save training logs
+np.save("results/train_losses.npy", np.array(train_losses))
+np.save("results/val_losses.npy", np.array(val_losses))
+np.save("results/train_accs.npy", np.array(train_accs))
+np.save("results/val_accs.npy", np.array(val_accs))
