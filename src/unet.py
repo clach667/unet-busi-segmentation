@@ -133,7 +133,7 @@ class UNetPlusPlus(nn.Module):
         # Decoder / Nested connections
         self.conv01 = DoubleConv(f + f*2, f, dropout)
         self.conv11 = DoubleConv(f*2 + f*4, f*2, dropout)
-        self.conv02 = DoubleConv(f + f, f, dropout)
+        self.conv02 = DoubleConv(f + f*2, f, dropout)
 
         self.final = nn.Conv2d(f, out_channels, kernel_size=1)
 
@@ -153,10 +153,3 @@ if __name__ == "__main__":
     x = torch.randn((1, 1, 256, 256))
     y = model(x)
     print(y.shape)
-
-
-if __name__ == "__main__":
-    model = UNetPlusPlus()
-    x = torch.randn((1, 1, 256, 256))  # 1 image grayscale 256x256
-    y = model(x)
-    print(y.shape)  # → torch.Size([1, 1, 256, 256])

@@ -29,7 +29,7 @@ train_logs = {"loss": [], "acc": []}
 val_logs = {"loss": [], "acc": []}
 
 # ====== Early Stopping ======
-early_stopper = EarlyStopping(patience=3, delta=0.001, path="results/unet_final.pt")
+early_stopper = EarlyStopping(patience=3, delta=0.01, path="results/unet_final.pt")
 
 # ====== Training Loop ======
 for epoch in range(1, EPOCHS + 1):
@@ -81,7 +81,3 @@ for epoch in range(1, EPOCHS + 1):
         print("Early stopping triggered.")
         break
 
-# ====== Save Logs ======
-import json
-with open("results/logs.json", "w") as f:
-    json.dump({"train": train_logs, "val": val_logs}, f)
