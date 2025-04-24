@@ -99,9 +99,64 @@ class MiniUNet(nn.Module):
         dec1 = self.dec1(torch.cat([dec1, enc1], dim=1))
 
         return torch.sigmoid(self.final(dec1))
-    
+
+
+class DoubleConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
+class BetterUNet(nn.Module):
+    def __init__(self, in_channels=1, out_channels=1, init_features=32):
+        super().__init__()
+        features = init_features
+
+        self.enc1 = DoubleConv(in_channels, features)
+        self.pool1 = nn.MaxPool2d(2)
+        self.enc2 = DoubleConv(features, features*2)
+        self.pool2 = nn.MaxPool2d(2)
+        self.enc3 = DoubleConv(features*2, features*4)
+        self.pool3 = nn.MaxPool2d(2)
+
+        self.bottleneck = DoubleConv(features*4, features*8)
+
+        self.up3 = nn.ConvTranspose2d(features*8, features*4, kernel_size=2, stride=2)
+        self.dec3 = DoubleConv(features*8, features*4)
+        self.up2 = nn.ConvTranspose2d(features*4, features*2, kernel_size=2, stride=2)
+        self.dec2 = DoubleConv(features*4, features*2)
+        self.up1 = nn.ConvTranspose2d(features*2, features, kernel_size=2, stride=2)
+        self.dec1 = DoubleConv(features*2, features)
+
+        self.final_conv = nn.Conv2d(features, out_channels, kernel_size=1)
+
+    def forward(self, x):
+        enc1 = self.enc1(x)
+        enc2 = self.enc2(self.pool1(enc1))
+        enc3 = self.enc3(self.pool2(enc2))
+
+        bottleneck = self.bottleneck(self.pool3(enc3))
+
+        dec3 = self.up3(bottleneck)
+        dec3 = self.dec3(torch.cat((dec3, enc3), dim=1))
+        dec2 = self.up2(dec3)
+        dec2 = self.dec2(torch.cat((dec2, enc2), dim=1))
+        dec1 = self.up1(dec2)
+        dec1 = self.dec1(torch.cat((dec1, enc1), dim=1))
+
+        return self.final_conv(dec1)
+
 if __name__ == "__main__":
-    model = MiniUNet()
+    model = BetterUNet()
     x = torch.randn((1, 1, 256, 256))  # 1 image grayscale 256x256
     y = model(x)
     print(y.shape)  # → torch.Size([1, 1, 256, 256])
