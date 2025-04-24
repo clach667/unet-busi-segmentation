@@ -63,4 +63,4 @@ def split_busi_dataset_balanced(
 
 
 if __name__ == "__main__":
-    split_busi_dataset_balanced("/Users/clarachoukroun/unet-busi-project/data/images","/Users/clarachoukroun/unet-busi-project/data/masks")
+    split_busi_dataset_balanced()
