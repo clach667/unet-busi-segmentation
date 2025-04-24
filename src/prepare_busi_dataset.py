@@ -56,7 +56,7 @@ def split_busi_dataset_balanced(
                 shutil.copy(img_path, Path(output_dir) / split / "images" / img_path.name)
                 shutil.copy(mask_path, Path(output_dir) / split / "masks" / mask_path.name)
 
-    print("✅ Balanced dataset split completed.")
+    print("Balanced dataset split completed.")
 
 # Usage:
 # split_busi_dataset_balanced()
