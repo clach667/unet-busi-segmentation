@@ -10,13 +10,7 @@ def split_busi_dataset_balanced(
     seed=42
 ):
     """
-    Split the BUSI dataset into train/val/test sets in a balanced way across 'benign' and 'malignant' classes.
-    
-    Parameters:
-        base_dir (str): Path to the original BUSI dataset (with 'benign' and 'malignant' subfolders).
-        output_dir (str): Root output directory for the split dataset.
-        split_ratio (tuple): Train/val/test ratio (should sum to 1.0).
-        seed (int): Random seed for reproducibility.
+    Split BUSI dataset into train/val/test, balanced per class, and save with matching filenames.
     """
     assert abs(sum(split_ratio) - 1.0) < 1e-6, "Split ratios must sum to 1.0"
     random.seed(seed)
@@ -24,7 +18,7 @@ def split_busi_dataset_balanced(
     classes = ["benign", "malignant"]
     splits = ["train", "val", "test"]
 
-    # Clean existing output folders
+    # Reset output directories
     for split in splits:
         for sub in ["images", "masks"]:
             split_path = Path(output_dir) / split / sub
@@ -32,15 +26,21 @@ def split_busi_dataset_balanced(
                 shutil.rmtree(split_path)
             split_path.mkdir(parents=True, exist_ok=True)
 
-    # Process each class separately
+    counter = {split: 0 for split in splits}
+
     for cls in classes:
         cls_path = Path(base_dir) / cls
-        image_files = sorted([f for f in cls_path.glob("*.png") if "mask" not in f.name])
-        mask_files = sorted([f for f in cls_path.glob("*.png") if "mask" in f.name])
+        image_files = sorted([f for f in cls_path.glob("*.png") if "_mask" not in f.name])
+        mask_files = sorted([f for f in cls_path.glob("*.png") if "_mask" in f.name])
 
-        paired = list(zip(image_files, mask_files))
+        paired = []
+        for img in image_files:
+            mask_name = img.stem + "_mask.png"
+            mask_path = cls_path / mask_name
+            if mask_path.exists():
+                paired.append((img, mask_path))
+
         random.shuffle(paired)
-
         n = len(paired)
         n_train = int(split_ratio[0] * n)
         n_val = int(split_ratio[1] * n)
@@ -53,13 +53,15 @@ def split_busi_dataset_balanced(
 
         for split in splits:
             for img_path, mask_path in split_data[split]:
-                shutil.copy(img_path, Path(output_dir) / split / "images" / img_path.name)
-                shutil.copy(mask_path, Path(output_dir) / split / "masks" / mask_path.name)
+                idx = counter[split]
+                name = f"{split}_{idx:04d}.png"
 
-    print("Balanced dataset split completed.")
+                shutil.copy(img_path, Path(output_dir) / split / "images" / name)
+                shutil.copy(mask_path, Path(output_dir) / split / "masks" / name)
 
-# Usage:
-# split_busi_dataset_balanced()
+                counter[split] += 1
+
+    print("✅ Balanced split complete with matching filenames.")
 
 
 if __name__ == "__main__":

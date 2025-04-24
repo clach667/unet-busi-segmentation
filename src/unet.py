@@ -104,59 +104,59 @@ class MiniUNet(nn.Module):
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels, dropout=0.0):
         super().__init__()
-        layers = [
+        self.block = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(dropout) if dropout > 0 else nn.Identity(),
+            nn.Dropout2d(dropout),
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Dropout2d(dropout) if dropout > 0 else nn.Identity(),
-        ]
-        self.block = nn.Sequential(*layers)
+            nn.Dropout2d(dropout),
+        )
 
     def forward(self, x):
         return self.block(x)
 
-
-class BetterUNet(nn.Module):
+class UNetPlusPlus(nn.Module):
     def __init__(self, in_channels=1, out_channels=1, init_features=32, dropout=0.0):
         super().__init__()
-        features = init_features
+        f = init_features
+        self.pool = nn.MaxPool2d(2)
+        self.up = lambda x: nn.functional.interpolate(x, scale_factor=2, mode='bilinear', align_corners=True)
 
-        self.enc1 = DoubleConv(in_channels, features, dropout)
-        self.pool1 = nn.MaxPool2d(2)
-        self.enc2 = DoubleConv(features, features*2, dropout)
-        self.pool2 = nn.MaxPool2d(2)
-        self.enc3 = DoubleConv(features*2, features*4, dropout)
-        self.pool3 = nn.MaxPool2d(2)
+        # Encoder
+        self.conv00 = DoubleConv(in_channels, f, dropout)
+        self.conv10 = DoubleConv(f, f*2, dropout)
+        self.conv20 = DoubleConv(f*2, f*4, dropout)
 
-        self.bottleneck = DoubleConv(features*4, features*8, dropout)
+        # Decoder / Nested connections
+        self.conv01 = DoubleConv(f + f*2, f, dropout)
+        self.conv11 = DoubleConv(f*2 + f*4, f*2, dropout)
+        self.conv02 = DoubleConv(f + f, f, dropout)
 
-        self.up3 = nn.ConvTranspose2d(features*8, features*4, kernel_size=2, stride=2)
-        self.dec3 = DoubleConv(features*8, features*4, dropout)
-        self.up2 = nn.ConvTranspose2d(features*4, features*2, kernel_size=2, stride=2)
-        self.dec2 = DoubleConv(features*4, features*2, dropout)
-        self.up1 = nn.ConvTranspose2d(features*2, features, kernel_size=2, stride=2)
-        self.dec1 = DoubleConv(features*2, features, dropout)
-
-        self.final_conv = nn.Conv2d(features, out_channels, kernel_size=1)
+        self.final = nn.Conv2d(f, out_channels, kernel_size=1)
 
     def forward(self, x):
-        enc1 = self.enc1(x)
-        enc2 = self.enc2(self.pool1(enc1))
-        enc3 = self.enc3(self.pool2(enc2))
-        bottleneck = self.bottleneck(self.pool3(enc3))
-        dec3 = self.dec3(torch.cat((self.up3(bottleneck), enc3), dim=1))
-        dec2 = self.dec2(torch.cat((self.up2(dec3), enc2), dim=1))
-        dec1 = self.dec1(torch.cat((self.up1(dec2), enc1), dim=1))
+        x00 = self.conv00(x)
+        x10 = self.conv10(self.pool(x00))
+        x01 = self.conv01(torch.cat([x00, self.up(x10)], 1))
 
-        return self.final_conv(dec1)
+        x20 = self.conv20(self.pool(x10))
+        x11 = self.conv11(torch.cat([x10, self.up(x20)], 1))
+        x02 = self.conv02(torch.cat([x01, self.up(x11)], 1))
+
+        return self.final(x02)
+
+if __name__ == "__main__":
+    model = UNetPlusPlus()
+    x = torch.randn((1, 1, 256, 256))
+    y = model(x)
+    print(y.shape)
 
 
 if __name__ == "__main__":
-    model = BetterUNet()
+    model = UNetPlusPlus()
     x = torch.randn((1, 1, 256, 256))  # 1 image grayscale 256x256
     y = model(x)
     print(y.shape)  # → torch.Size([1, 1, 256, 256])
