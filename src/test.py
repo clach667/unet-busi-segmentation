@@ -15,28 +15,23 @@ from utils import compute_dice, compute_accuracy
 
 # ----------- Config ---------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-MODEL_PATH = "results/unet_final.pt"  
-IMAGE_SIZE = (256, 256)
-
-# ----------- Dataset -------------
-test_set = BUSIDataset("data/test/images", "data/test/masks", size=IMAGE_SIZE)
-test_loader = DataLoader(test_set, batch_size=1)
-
-# ----------- Load model ----------
 model = UNet().to(DEVICE)
-model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+model.load_state_dict(torch.load("results/unet_final.pt", map_location=DEVICE))
 model.eval()
 
 # ----------- Evaluation ----------
-dice_scores = []
-acc_scores = []
-n_visuals = 4
-shown = 0
+def evaluate_model(model, device, image_dir, mask_dir, size=(256, 256), batch_size=1, n_visuals=4):
+    model.eval()
+    dataset = BUSIDataset(image_dir, mask_dir, size=size)
+    loader = DataLoader(dataset, batch_size=batch_size)
+    
+    dice_scores = []
+    acc_scores = []
+    shown = 0
 
-
-with torch.no_grad():
-        for img, mask in test_loader:
-            img, mask = img.to(DEVICE), mask.to(DEVICE)
+    with torch.no_grad():
+        for img, mask in loader:
+            img, mask = img.to(device), mask.to(device)
             pred = torch.sigmoid(model(img))
 
             dice = compute_dice(pred, mask)
@@ -56,8 +51,11 @@ with torch.no_grad():
                     ax.axis("off")
                 plt.tight_layout()
                 plt.show()
-                shown += 1    
+                shown += 1
 
-# ----------- Results ------------
-print(f"Test Dice Score: {np.mean(dice_scores):.4f}")
-print(f"Test Accuracy:   {np.mean(acc_scores):.4f}")
+    print(f"Test Dice Score: {np.mean(dice_scores):.4f}")
+    print(f"Test Accuracy:   {np.mean(acc_scores):.4f}")
+
+    return dice_scores, acc_scores
+
+evaluate_model(model, DEVICE, "data/test/images", "data/test/masks")
