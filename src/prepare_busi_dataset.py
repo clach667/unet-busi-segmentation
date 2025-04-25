@@ -3,6 +3,11 @@ import shutil
 import random
 from pathlib import Path
 
+import os
+import shutil
+import random
+from pathlib import Path
+
 def split_busi_dataset_balanced(
     base_dir="data/Dataset_BUSI_with_GT",
     output_dir="data",
@@ -10,23 +15,22 @@ def split_busi_dataset_balanced(
     seed=42
 ):
     """
-    Split BUSI dataset into train/val/test, balanced per class, and save with matching filenames.
+    Split BUSI dataset into train/val/test sets while preserving original filenames
+    and balancing the number of samples per class (benign/malignant).
     """
     assert abs(sum(split_ratio) - 1.0) < 1e-6, "Split ratios must sum to 1.0"
     random.seed(seed)
-    
+
     classes = ["benign", "malignant"]
     splits = ["train", "val", "test"]
 
-    # Reset output directories
+    # Clean and recreate output directories
     for split in splits:
-        for sub in ["images", "masks"]:
-            split_path = Path(output_dir) / split / sub
-            if split_path.exists():
-                shutil.rmtree(split_path)
-            split_path.mkdir(parents=True, exist_ok=True)
-
-    counter = {split: 0 for split in splits}
+        for subfolder in ["images", "masks"]:
+            path = Path(output_dir) / split / subfolder
+            if path.exists():
+                shutil.rmtree(path)
+            path.mkdir(parents=True, exist_ok=True)
 
     for cls in classes:
         cls_path = Path(base_dir) / cls
@@ -34,35 +38,28 @@ def split_busi_dataset_balanced(
         mask_files = sorted([f for f in cls_path.glob("*.png") if "_mask" in f.name])
 
         paired = []
-        for img in image_files:
-            mask_name = img.stem + "_mask.png"
-            mask_path = cls_path / mask_name
+        for img_path in image_files:
+            mask_path = cls_path / f"{img_path.stem}_mask.png"
             if mask_path.exists():
-                paired.append((img, mask_path))
+                paired.append((img_path, mask_path))
 
         random.shuffle(paired)
-        n = len(paired)
-        n_train = int(split_ratio[0] * n)
-        n_val = int(split_ratio[1] * n)
+        n_total = len(paired)
+        n_train = int(split_ratio[0] * n_total)
+        n_val = int(split_ratio[1] * n_total)
 
-        split_data = {
+        splits_data = {
             "train": paired[:n_train],
             "val": paired[n_train:n_train + n_val],
             "test": paired[n_train + n_val:]
         }
 
-        for split in splits:
-            for img_path, mask_path in split_data[split]:
-                idx = counter[split]
-                name = f"{split}_{idx:04d}.png"
+        for split, samples in splits_data.items():
+            for img_path, mask_path in samples:
+                # Preserve original filenames
+                shutil.copy(img_path, Path(output_dir) / split / "images" / img_path.name)
+                shutil.copy(mask_path, Path(output_dir) / split / "masks" / mask_path.name)
 
-                shutil.copy(img_path, Path(output_dir) / split / "images" / name)
-                shutil.copy(mask_path, Path(output_dir) / split / "masks" / name)
+    print("✅ Balanced split complete with original filenames preserved.")
 
-                counter[split] += 1
-
-    print("✅ Balanced split complete with matching filenames.")
-
-
-if __name__ == "__main__":
-    split_busi_dataset_balanced()
+split_busi_dataset_balanced()

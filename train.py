@@ -1,7 +1,7 @@
 import os
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader,  WeightedRandomSampler
 from tqdm import tqdm
 from src.dataset import BUSIDataset
 from src.unet import UNet  # Tu peux aussi l'appeler BetterUNet si tu veux
@@ -9,16 +9,28 @@ from src.utils import dice_loss, binary_accuracy
 from src.early_stopping import EarlyStopping
 
 # ====== Config ======
-EPOCHS = 12
+EPOCHS = 20
 BATCH_SIZE = 8
 LR = 1e-4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # ====== Dataset ======
-train_set = BUSIDataset("data/train/images", "data/train/masks", size=(256, 256))
-val_set = BUSIDataset("data/val/images", "data/val/masks", size=(256, 256))
-train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_set, batch_size=BATCH_SIZE)
+from torch.utils.data import DataLoader, WeightedRandomSampler
+
+train_set = BUSIDataset("data/train/images", "data/train/masks", size=(256, 256), augment_malignant=True)
+val_set = BUSIDataset("data/val/images", "data/val/masks", size=(256, 256), augment_malignant=False)
+
+class_counts = [0, 0]
+for fname in train_set.image_names:
+    label = 0 if "benign" in fname.lower() else 1
+    class_counts[label] += 1
+
+weights = [1.0 / class_counts[0] if "benign" in fname.lower() else 1.0 / class_counts[1] for fname in train_set.image_names]
+sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+
+
+train_loader = DataLoader(train_set, batch_size=8, sampler=sampler)
+val_loader = DataLoader(val_set, batch_size=8)
 
 # ====== Model ======
 model = UNet().to(DEVICE)

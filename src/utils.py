@@ -27,3 +27,4 @@ def compute_dice(pred, target, eps=1e-8):
 def compute_accuracy(pred, target):
     pred = (pred > 0.5).float()
     return (pred == target).float().mean()
+
